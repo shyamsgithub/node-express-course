@@ -4,6 +4,7 @@ const app=express();
 const bodyParser=require("body-parser");
 app.use(bodyParser.json())
 
+const bCrypt=require("bcrypt")
 
 const mockUserData=[
     {name:"Mark"},
@@ -26,26 +27,53 @@ app.get("/users/:id", (req, res)=>{
     })
 })
 
-app.post("/login", (req, res)=>{
-    const username=req.body.username;
-    const password=req.body.password;
+//create new user
+const UserData=[];
 
-    const mockUsername="billyTheKid";
-    const mockPassword="superSecret";
-
-    if(username===mockUsername&&password===mockPassword){
-        res.json({
-            success:true, 
-            message:"password and username match",
-            token: "encrypted token goes here"
-        })
+app.post("/newUser", async(req, res)=>{
+    let match=UserData.find(user=>user.username===req.body.username);
+    if(match==null){
+        try{
+            let hashedPassword=await bCrypt.hash(req.body.password, 10)
+            let newuser={username:req.body.username, password:hashedPassword};
+            UserData.push(newuser);
+            res.status(201).send(`New user ${newuser.username} has been created`)
+        }catch{
+            res.status(500).send()
+        }
     }else{
-        res.json({
-            success:false,
-            message:"password and username do not match"
-        })
+        res.send(`${match.username} already exists`)
+    }
+
+})
+
+
+app.post("/login", async (req, res)=>{
+
+    let user=UserData.find(element=>element.username===req.body.username);
+    if(!user){
+        return res.status(400).send("Username does not exist")
+    }
+
+    try{
+        if(await bCrypt.compare(req.body.password, user.password)){
+            res.json({
+                success:true, 
+                message:"password and username match",
+                token: "encrypted token goes here"
+            })}
+        else{
+            res.json({
+                success:false,
+                message:"password and username do not match"
+            })
+        }
+    }catch{
+        res.status(500).send()
     }
 })
 
 
 app.listen(8000, ()=>{console.log("server is running")})
+
+
